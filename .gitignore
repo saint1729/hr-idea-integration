@@ -1,0 +1,7 @@
+# hr-idea-integration
+This project is used to integrate HackerRank portal problems/submisions with IDEA
+/.idea/.gitignore
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/hr-idea-integration.iml
