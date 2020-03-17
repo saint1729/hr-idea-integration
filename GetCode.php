@@ -36,11 +36,10 @@ class Constants
     const FINDER_QUERY_START = "//*[contains(concat(' ', normalize-space(@class), ' '), ' ";
     const FINDER_QUERY_END = " ')]";
     const HTML_DIV_START = "<html><body><div style=\"display: block;
-            margin: 10px auto;
-            padding: 20px;
-            background: rgb(245, 245, 245);
-            border: 1px solid #9D1535;
-            border-radius: 10px;
+            margin: 100px auto;
+            padding: 30px;
+            background: rgb(250, 250, 250);
+            box-shadow: 0 6px 16px 0 rgba(0,0,0,.2);
             width: 90%;
             position: relative;
             transition: all 5s ease-in-out;\">";
@@ -97,7 +96,7 @@ function getProblemStatement($html)
 
     $finder = new DomXPath($dom);
     $classname = Constants::CHALLENGE_BODY_CLASS_NAME;
-    $nodes = $finder->query(Constants::FINDER_QUERY_START .  $classname . Constants::FINDER_QUERY_END);
+    $nodes = $finder->query(Constants::FINDER_QUERY_START . $classname . Constants::FINDER_QUERY_END);
 
     $out_dom = new DOMDocument();
 
@@ -217,7 +216,7 @@ function saveProblemsAndSolutions($models, $domain, &$no_solution_slugs): void
         $problemFileNameHTML = $problemFileNamesHTML[$i];
         $problemFileNamePDF = $problemFileNamesPDF[$i];
         $solutionFileName = $solutionFileNames[$i];
-        echo $problemFileNameHTML . Constants::SPACE . $solutionFileName . Constants::NEW_LINE;
+//        echo $problemFileNameHTML . Constants::SPACE . $solutionFileName . Constants::NEW_LINE;
         saveToFile(getProblemStatement($response), $problemFileNameHTML);
         exec(Constants::WKHTMLTOPDF_PATH . Constants::SPACE . $problemFileNameHTML . Constants::SPACE . $problemFileNamePDF);
         $solution = getSolution($response, $slug);
@@ -242,12 +241,11 @@ function main(): void
 
     $domain_count = sizeof($domains);
     for ($i = 0; $i < $domain_count; $i++) {
-        $start = Constants::URL_PARAM_START;
 
+        $start = Constants::URL_PARAM_START;
         $url = $track_urls[$i][0] . $start . $track_urls[$i][1];
         $models = getModels(getResponse($url));
         $all_models = array();
-
         while (sizeof($models) > 0) {
             array_push($all_models, ...$models);
             $start = $start + Constants::URL_PARAM_LIMIT_VAL;
@@ -255,26 +253,32 @@ function main(): void
             $models = getModels(getResponse($url));
         }
 
-        $all_models = array((object)array('slug' => 'kth-ancestor'),
-            (object)array('slug' => 'dag-queries'),
-            (object)array('slug' => 'favourite-sequence'),
-            (object)array('slug' => 'cat-jogging'),
-            (object)array('slug' => 'training-the-army'),
-            (object)array('slug' => 'going-office'),
-            (object)array('slug' => 'ticket'),
-            (object)array('slug' => 'team-formation'),
-            (object)array('slug' => 'beautiful-3-set'),
-            (object)array('slug' => 'inverse-rmq'),
-            (object)array('slug' => 'superman-celebrates-diwali'),
-            (object)array('slug' => 'dorsey-thief'),
-            (object)array('slug' => 'zurikela'),
-            (object)array('slug' => 'hamming-distance'),
-            (object)array('slug' => 'repeat-k-sums'),
-            (object)array('slug' => 'move-the-coins'),
-            (object)array('slug' => 'walking-the-approximate-longest-path'),
-            (object)array('slug' => 'spies-revised')
-        );
-        saveProblemsAndSolutions($all_models, $domains[$i]);
+//         test data
+//        $all_models = array((object)array('slug' => 'kth-ancestor'),
+//            (object)array('slug' => 'dag-queries'),
+//            (object)array('slug' => 'favourite-sequence'),
+//            (object)array('slug' => 'cat-jogging'),
+//            (object)array('slug' => 'training-the-army'),
+//            (object)array('slug' => 'going-office'),
+//            (object)array('slug' => 'ticket'),
+//            (object)array('slug' => 'team-formation'),
+//            (object)array('slug' => 'beautiful-3-set'),
+//            (object)array('slug' => 'inverse-rmq'),
+//            (object)array('slug' => 'superman-celebrates-diwali'),
+//            (object)array('slug' => 'dorsey-thief'),
+//            (object)array('slug' => 'zurikela'),
+//            (object)array('slug' => 'hamming-distance'),
+//            (object)array('slug' => 'repeat-k-sums'),
+//            (object)array('slug' => 'move-the-coins'),
+//            (object)array('slug' => 'walking-the-approximate-longest-path'),
+//            (object)array('slug' => 'spies-revised')
+//        );
+
+        $no_solution_slugs = array();
+        saveProblemsAndSolutions($all_models, $domains[$i], $no_solution_slugs);
+
+        print_r($no_solution_slugs);
+
     }
 }
 
