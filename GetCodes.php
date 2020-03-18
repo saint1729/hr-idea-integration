@@ -28,6 +28,7 @@ class Constants
     const HTML_EXTENSION = ".html";
     const PDF_EXTENSION = ".pdf";
     const SOLUTION_FILENAME = "Solution.java";
+    const NO_SOLUTION_SLUG_FILENAME = "no-solution.out";
     const SOLUTION_ID = "initialData";
     const CHALLENGE_BODY_CLASS_NAME = "challenge-body-html";
     const HOME_DIR_CONST = "HOME";
@@ -48,6 +49,9 @@ class Constants
     const JAVA_TEMPLATE = "java_template";
     const JAVA_TEMPLATE_TAIL = "java_template_tail";
     const WKHTMLTOPDF_PATH = "/usr/bin/wkhtmltopdf";
+    const WKHTMLTOPDF_QUIET = "--quiet";
+    const WKHTMLTOPDF_WRONG_URL_CONST = "=\"//";
+    const WKHTMLTOPDF_CORRECT_URL_CONST = "=\"http://";
 }
 
 /**
@@ -127,19 +131,19 @@ function getSolution($html, $slug)
     $detail = $json_obj->community->challenges->challenge->{$master_slug}->detail;
 
     if (array_key_exists(Constants::JAVA_TEMPLATE_HEAD, $detail)) {
-        $solution[] = $detail[Constants::JAVA_TEMPLATE_HEAD];
+        $solution[] = $detail->{Constants::JAVA_TEMPLATE_HEAD};
     } else {
         $solution[] = "";
     }
 
     if (array_key_exists(Constants::JAVA_TEMPLATE, $detail)) {
-        $solution[] = $detail[Constants::JAVA_TEMPLATE];
+        $solution[] = $detail->{Constants::JAVA_TEMPLATE};
     } else {
         $solution[] = "";
     }
 
     if (array_key_exists(Constants::JAVA_TEMPLATE_TAIL, $detail)) {
-        $solution[] = $detail->java_template_tail;
+        $solution[] = $detail->{Constants::JAVA_TEMPLATE_TAIL};
     } else {
         $solution[] = "";
     }
@@ -208,17 +212,25 @@ function saveProblemsAndSolutions($models, $domain, &$no_solution_slugs): void
         $solutionFileNames[] = $content_dir . "${slug}" . Constants::FORWARD_SLASH . Constants::SOLUTION_FILENAME;
     }
 
-//    $no_solution_slugs = array();
+
+    //    $no_solution_slugs = array();
     for ($i = 0; $i < $problem_count; $i++) {
         $slug = $problem_urls[$i][Constants::SLUG];
         $problem_url = $problem_urls[$i][Constants::URL];
         $response = getResponse($problem_url);
+
+        // Hack to avoid infinite wait issues with wkhtmltopdf. It first occurred for problem with slug "longest-increasing-subsequent".
+        $response = str_replace(Constants::WKHTMLTOPDF_WRONG_URL_CONST, Constants::WKHTMLTOPDF_CORRECT_URL_CONST, $response);
+
         $problemFileNameHTML = $problemFileNamesHTML[$i];
         $problemFileNamePDF = $problemFileNamesPDF[$i];
         $solutionFileName = $solutionFileNames[$i];
-//        echo $problemFileNameHTML . Constants::SPACE . $solutionFileName . Constants::NEW_LINE;
+        echo $problemFileNameHTML . Constants::SPACE . $solutionFileName . Constants::NEW_LINE;
         saveToFile(getProblemStatement($response), $problemFileNameHTML);
-        exec(Constants::WKHTMLTOPDF_PATH . Constants::SPACE . $problemFileNameHTML . Constants::SPACE . $problemFileNamePDF);
+        exec(Constants::WKHTMLTOPDF_PATH
+            . Constants::SPACE . Constants::WKHTMLTOPDF_QUIET
+            . Constants::SPACE . $problemFileNameHTML
+            . Constants::SPACE . $problemFileNamePDF);
         $solution = getSolution($response, $slug);
         $code = $solution[0] . $solution[1] . $solution[2];
         saveToFile($code, $solutionFileName);
@@ -229,12 +241,25 @@ function saveProblemsAndSolutions($models, $domain, &$no_solution_slugs): void
 
 }
 
+function debug_enable()
+{
+    $fdOut = fopen(Constants::LOG_FILE, 'w');
+
+    eio_dup2($fdOut, STDOUT);
+    eio_dup2($fdOut, STDERR);
+    eio_event_loop();
+
+    fclose($fdOut);
+}
 
 /**
  * This method internally scrapes and saves all problem statements and solutions from HackerRank portal and saves to machine.
  */
 function main(): void
 {
+
+    debug_enable();
+
     $domains = Constants::DOMAINS;
 
     $track_urls = getTrackURLs($domains);
@@ -253,7 +278,7 @@ function main(): void
             $models = getModels(getResponse($url));
         }
 
-//         test data
+//         test data 1
 //        $all_models = array((object)array('slug' => 'kth-ancestor'),
 //            (object)array('slug' => 'dag-queries'),
 //            (object)array('slug' => 'favourite-sequence'),
@@ -274,23 +299,25 @@ function main(): void
 //            (object)array('slug' => 'spies-revised')
 //        );
 
+//          test data 2
+//        $all_models = array((object)array('slug' => 'longest-increasing-subsequent'));
+
         $no_solution_slugs = array();
         saveProblemsAndSolutions($all_models, $domains[$i], $no_solution_slugs);
 
-        print_r($no_solution_slugs);
+        saveToFile(var_export($no_solution_slugs, true), Constants::NO_SOLUTION_SLUG_FILENAME);
 
     }
 }
 
-$fdOut = fopen(Constants::LOG_FILE, 'a');
 
-eio_dup2($fdOut, STDOUT);
-eio_dup2($fdOut, STDERR);
-eio_event_loop();
 
-fclose($fdOut);
-
+$time_pre = microtime(true);
 main();
+$time_post = microtime(true);
+
+echo "Total time elapsed (in HH:MM:SS format) = " . gmdate("H:i:s", ($time_post - $time_pre)) . "\n";
+
 
 
 ?>
