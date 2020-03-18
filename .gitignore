@@ -5,3 +5,5 @@ This project is used to integrate HackerRank portal problems/submisions with IDE
 /.idea/modules.xml
 /.idea/vcs.xml
 /.idea/hr-idea-integration.iml
+/.idea/php.xml
+/debug.log
