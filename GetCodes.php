@@ -3,19 +3,25 @@
 class Constants
 {
     const MASTER = "master";
+    const SUBDOMAINS = "subdomains";
     const TRACK_URL_CONST = "/rest/contests/" . Constants::MASTER . "/tracks/";
     const CHALLENGES_URL_CONST = "/challenges/";
     const PROBLEM_URL_CONST = "/problem/";
     const URL_PREFIX = "https://www.hackerrank.com/";
     const URL_PARAM_OFFSET = "offset";
     const URL_PARAM_LIMIT = "limit";
+    const URL_PARAM_FILTERS = "filters";
     const CONTENT = "/content/";
     const CURL_AGENT = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:59.0) Gecko/20100101 Firefox/59.0';
+    const GET_REQUEST_TYPE = "GET";
+    const AUTH_HEADER = "Authorization: Basic ";
 
     const QUESTION_MARK = "?";
     const AMPERSAND = "&";
     const EQUALS = "=";
     const FORWARD_SLASH = "/";
+    const SQ_BRACE_OPEN = "%5B";
+    const SQ_BRACE_CLOSE = "%5D";
     const SPACE = " ";
     const EMPTY_STRING = "";
     const NEW_LINE = "\n";
@@ -32,7 +38,10 @@ class Constants
     const SOLUTION_ID = "initialData";
     const CHALLENGE_BODY_CLASS_NAME = "challenge-body-html";
     const HOME_DIR_CONST = "HOME";
-    const DOMAINS = ['algorithms', 'data-structures'];
+
+    // add more values to scrape more data
+    const DOMAINS = ['algorithms', 'data-structures', 'tutorials/30-days-of-code'];
+
     const LOG_FILE = "debug.log";
     const FINDER_QUERY_START = "//*[contains(concat(' ', normalize-space(@class), ' '), ' ";
     const FINDER_QUERY_END = " ')]";
@@ -63,31 +72,56 @@ function getTrackURLs(array $domains): array
     $track_urls = [];
 
     foreach ($domains as $domain) {
+        $filters = explode(Constants::FORWARD_SLASH, $domain);
         $url = array();
-        $url[] = Constants::URL_PREFIX . Constants::TRACK_URL_CONST . $domain
+        $url[] = Constants::URL_PREFIX . Constants::TRACK_URL_CONST . $filters[0]
             . Constants::CHALLENGES_URL_CONST . Constants::QUESTION_MARK
             . Constants::URL_PARAM_OFFSET . Constants::EQUALS;
         $url[] = Constants::AMPERSAND . Constants::URL_PARAM_LIMIT
             . Constants::EQUALS . Constants::URL_PARAM_LIMIT_VAL;
+        if (sizeof($filters) > 1) {
+            $url[] = Constants::AMPERSAND . Constants::URL_PARAM_FILTERS
+                . Constants::SQ_BRACE_OPEN . Constants::SUBDOMAINS
+                . Constants::SQ_BRACE_CLOSE . Constants::SQ_BRACE_OPEN
+                . Constants::SQ_BRACE_CLOSE . Constants::EQUALS
+                . $filters[1];
+        }
         array_push($track_urls, $url);
     }
     return $track_urls;
 }
 
+function getURLFromTokens($tokens, $start_val) {
+    if (sizeof($tokens) == 2) {
+        return $tokens[0] . $start_val . $tokens[1];
+    } else {
+        return $tokens[0] . $start_val . $tokens[1] . $tokens[2];
+    }
+}
 
-function getResponse($url)
+
+function getResponse($url, $argv)
 {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_USERAGENT, Constants::CURL_AGENT);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_ENCODING, true);
-    $response = curl_exec($ch);
-    curl_close($ch);
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_USERAGENT => Constants::CURL_AGENT,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_ENCODING => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => Constants::GET_REQUEST_TYPE,
+        CURLOPT_HTTPHEADER => array(
+            Constants::AUTH_HEADER . $argv[1]
+        ),
+    ));
+
+    $response = curl_exec($curl);
+    curl_close($curl);
 
     return $response;
 }
@@ -191,7 +225,7 @@ function saveToFile($text, $fileName)
  * @param $domain
  * @param $no_solution_slugs
  */
-function saveProblemsAndSolutions($models, $domain, &$no_solution_slugs): void
+function saveProblemsAndSolutions($models, $domain, $argv, &$no_solution_slugs): void
 {
     $problem_urls = getProblemURLs($models);
     $problem_count = sizeof($problem_urls);
@@ -217,7 +251,7 @@ function saveProblemsAndSolutions($models, $domain, &$no_solution_slugs): void
     for ($i = 0; $i < $problem_count; $i++) {
         $slug = $problem_urls[$i][Constants::SLUG];
         $problem_url = $problem_urls[$i][Constants::URL];
-        $response = getResponse($problem_url);
+        $response = getResponse($problem_url, $argv);
 
         // Hack to avoid infinite wait issues with wkhtmltopdf. It first occurred for problem with slug "longest-increasing-subsequent".
         $response = str_replace(Constants::WKHTMLTOPDF_WRONG_URL_CONST, Constants::WKHTMLTOPDF_CORRECT_URL_CONST, $response);
@@ -255,8 +289,13 @@ function debug_enable()
 /**
  * This method internally scrapes and saves all problem statements and solutions from HackerRank portal and saves to machine.
  */
-function main(): void
+function main($argv): void
 {
+
+    if (sizeof($argv) != 2) {
+        echo "Usage: /usr/bin/php GetCodes.php <encrypted_password>\n";
+        exit(1);
+    }
 
     debug_enable();
 
@@ -268,14 +307,14 @@ function main(): void
     for ($i = 0; $i < $domain_count; $i++) {
 
         $start = Constants::URL_PARAM_START;
-        $url = $track_urls[$i][0] . $start . $track_urls[$i][1];
-        $models = getModels(getResponse($url));
+        $url = getURLFromTokens($track_urls[$i], $start); // $track_urls[$i][0] . $start . $track_urls[$i][1];
+        $models = getModels(getResponse($url, $argv));
         $all_models = array();
         while (sizeof($models) > 0) {
             array_push($all_models, ...$models);
             $start = $start + Constants::URL_PARAM_LIMIT_VAL;
-            $url = $track_urls[$i][0] . $start . $track_urls[$i][1];
-            $models = getModels(getResponse($url));
+            $url = getURLFromTokens($track_urls[$i], $start); // $track_urls[$i][0] . $start . $track_urls[$i][1];
+            $models = getModels(getResponse($url, $argv));
         }
 
 //         test data 1
@@ -303,7 +342,7 @@ function main(): void
 //        $all_models = array((object)array('slug' => 'longest-increasing-subsequent'));
 
         $no_solution_slugs = array();
-        saveProblemsAndSolutions($all_models, $domains[$i], $no_solution_slugs);
+        saveProblemsAndSolutions($all_models, $domains[$i], $argv, $no_solution_slugs);
 
         saveToFile(var_export($no_solution_slugs, true), Constants::NO_SOLUTION_SLUG_FILENAME);
 
@@ -313,7 +352,7 @@ function main(): void
 
 
 $time_pre = microtime(true);
-main();
+main($argv);
 $time_post = microtime(true);
 
 echo "Total time elapsed (in HH:MM:SS format) = " . gmdate("H:i:s", ($time_post - $time_pre)) . "\n";
