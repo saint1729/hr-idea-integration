@@ -40,7 +40,7 @@ It also gets the stub-code (if any) and saves it to `Solution.java` file in the 
 
 It will create a `debug.log` in the same directory from where the script is executed. Once you run the script if you see any issues, feel free to report an issue on GitHub.
 
-It will generate a `no-solution.out` file which contains the [slugs][1] for problem statements 
+It will generate a `no-solution.out` file which contains the `slugs`[1] for problem statements.
 
 It took 38 m 50 s to scrape all content for domains `['algorithms', 'data-structures', 'tutorials/30-days-of-code']` from the website.
 
